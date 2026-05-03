@@ -1,7 +1,8 @@
 // ── Config ───────────────────────────────────────────────────────────────────
-const CONFIG = {
-  baudRate: 9600,
-  deviceName: "ESP32-Relay",
+const BLE_CONFIG = {
+  serviceName: "ESP32-Relay",
+  serviceUUID: "0000180a-0000-1000-8000-00805f9b34fb",
+  charCommandUUID: "00002a19-0000-1000-8000-00805f9b34fb",
   relays: [
     { id: 1, name: "Channel 1" },
     { id: 2, name: "Channel 2" },
@@ -10,35 +11,14 @@ const CONFIG = {
   ]
 };
 
-// Load config from localStorage or use defaults
-function loadConfig() {
-  const saved = localStorage.getItem("relayConfig");
-  if (saved) {
-    const parsed = JSON.parse(saved);
-    Object.assign(CONFIG, parsed);
-  }
-}
-
-// Save config to localStorage
-function saveConfig() {
-  localStorage.setItem("relayConfig", JSON.stringify(CONFIG));
-}
-
-// Update relay names in DOM
-function updateRelayNames() {
-  CONFIG.relays.forEach((relay, idx) => {
-    const input = document.getElementById(`relayName${relay.id}`);
-    if (input) input.value = relay.name;
-  });
-}
-
 // ── State ─────────────────────────────────────────────────────────────────────
-let port = null;
-let reader = null;
-let writer = null;
+let device = null;
+let server = null;
+let service = null;
+let charCommand = null;
 let connected = false;
 
-// ── Log utility ───────────────────────────────────────────────────────────────
+// ── Logging ───────────────────────────────────────────────────────────────────
 function addLog(msg, isError = false) {
   const logDiv = document.getElementById("log");
   const entry = document.createElement("div");
@@ -49,7 +29,7 @@ function addLog(msg, isError = false) {
   logDiv.scrollTop = logDiv.scrollHeight;
 }
 
-// ── UI update ─────────────────────────────────────────────────────────────────
+// ── UI ─────────────────────────────────────────────────────────────────────────
 function updateUI(isConnected) {
   connected = isConnected;
   const indicator = document.getElementById("statusIndicator");
@@ -57,7 +37,6 @@ function updateUI(isConnected) {
   const btnConnect = document.getElementById("btnConnect");
   const btnDisconnect = document.getElementById("btnDisconnect");
   const relayButtons = document.querySelectorAll(".btn-relay");
-  const configInputs = document.querySelectorAll(".config-field input");
 
   if (isConnected) {
     indicator.classList.add("connected");
@@ -65,112 +44,84 @@ function updateUI(isConnected) {
     btnConnect.style.display = "none";
     btnDisconnect.style.display = "block";
     relayButtons.forEach(b => b.disabled = false);
-    configInputs.forEach(i => i.disabled = true);
-    addLog("Connected to ESP32-Relay");
+    addLog(`Connected to ${device.name}`);
   } else {
     indicator.classList.remove("connected");
     statusText.textContent = "Disconnected";
     btnConnect.style.display = "block";
     btnDisconnect.style.display = "none";
     relayButtons.forEach(b => b.disabled = true);
-    configInputs.forEach(i => i.disabled = false);
     addLog("Disconnected", true);
   }
 }
 
-// ── Serial communication ──────────────────────────────────────────────────────
+// ── BLE Relay state listener ──────────────────────────────────────────────────
+// Disabled for minimal BLE (no state characteristic)
+// async function watchRelayState() {
+//   ...
+// }
+
+// ── Send command ──────────────────────────────────────────────────────────────
 async function sendCommand(channel, action) {
   if (!connected) {
     addLog("Not connected", true);
     return;
   }
-  const cmd = `CH${channel}:${action}\n`;
-  try {
-    addLog(`[SEND] "${cmd.trim()}" (${cmd.length} bytes)`);
-    const encoded = new TextEncoder().encode(cmd);
-    addLog(`[BYTES] ${Array.from(encoded).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ')}`);
-    await writer.write(encoded);
-  } catch (err) {
-    addLog(`Send error: ${err.message}`, true);
-  }
-}
 
-async function readSerial() {
   try {
-    addLog("[READ] Starting to read from ESP32...");
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) {
-        addLog("[READ] Stream closed", true);
-        break;
-      }
-      const text = new TextDecoder().decode(value);
-      addLog(`[RECV] ${JSON.stringify(text)}`);
-      addLog(`[BYTES] ${Array.from(value).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ')}`);
-    }
+    // ASCII format: "CH1:ON\n"
+    const cmd = `CH${channel}:${action}\n`;
+    const encoded = new TextEncoder().encode(cmd);
+    addLog(`[SEND] "${cmd.trim()}" (${encoded.length} bytes)`);
+    addLog(`[BYTES] ${Array.from(encoded).map(b => "0x" + b.toString(16).padStart(2, "0")).join(" ")}`);
+    
+    await charCommand.writeValue(encoded);
+    addLog("[SEND] ✓");
   } catch (err) {
-    if (err.name !== "AbortError") {
-      addLog(`Read error: ${err.message}`, true);
-    }
+    addLog(`[SEND] Error: ${err.message}`, true);
   }
-  updateUI(false);
 }
 
 // ── Connect ───────────────────────────────────────────────────────────────────
 document.getElementById("btnConnect").addEventListener("click", async () => {
   try {
-    addLog("[CONNECT] Requesting port from user...");
-    port = await navigator.serial.requestPort();
-    const info = port.getInfo();
-    addLog(`[CONNECT] Port selected - VendorID: ${info.usbVendorId}, ProductID: ${info.usbProductId}`);
+    addLog("[CONNECT] Requesting device...");
+    device = await navigator.bluetooth.requestDevice({
+      filters: [{ namePrefix: BLE_CONFIG.serviceName }],
+      optionalServices: [BLE_CONFIG.serviceUUID]
+    });
+    addLog(`[CONNECT] Device selected: ${device.name}`);
 
-    addLog(`[CONNECT] Opening port at ${CONFIG.baudRate} baud...`);
-    await port.open({ baudRate: CONFIG.baudRate });
-    addLog("[CONNECT] ✓ Port opened");
+    addLog("[CONNECT] Connecting to GATT server...");
+    server = await device.gatt.connect();
+    addLog("[CONNECT] ✓ GATT server connected");
 
-    addLog("[CONNECT] Setting up text encoder stream...");
-    const textEncoder = new TextEncoderStream();
-    const writableStreamClosed = textEncoder.readable.pipeTo(port.writable);
-    writer = textEncoder.writable.getWriter();
-    addLog("[CONNECT] ✓ Writer ready");
+    addLog("[CONNECT] Getting service...");
+    service = await server.getPrimaryService(BLE_CONFIG.serviceUUID);
+    addLog("[CONNECT] ✓ Service found");
 
-    addLog("[CONNECT] Setting up text decoder stream...");
-    const textDecoder = new TextDecoderStream();
-    const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
-    reader = textDecoder.readable.getReader();
-    addLog("[CONNECT] ✓ Reader ready");
+    addLog("[CONNECT] Getting characteristics...");
+    charCommand = await service.getCharacteristic(BLE_CONFIG.charCommandUUID);
+    addLog("[CONNECT] ✓ Characteristic found");
 
-    addLog("[CONNECT] ✓ Connection established");
     updateUI(true);
-    readSerial();
+
+    device.addEventListener("gattserverdisconnected", () => {
+      updateUI(false);
+    });
   } catch (err) {
     if (err.name !== "NotFoundError") {
       addLog(`[CONNECT] Error: ${err.name} - ${err.message}`, true);
-    } else {
-      addLog("[CONNECT] Port selection cancelled", true);
     }
   }
 });
 
 // ── Disconnect ────────────────────────────────────────────────────────────────
-document.getElementById("btnDisconnect").addEventListener("click", async () => {
-  addLog("[DISCONNECT] Closing connection...");
-  if (reader) {
-    reader.cancel();
-    addLog("[DISCONNECT] Reader cancelled");
+document.getElementById("btnDisconnect").addEventListener("click", () => {
+  if (device && device.gatt.connected) {
+    device.gatt.disconnect();
+    updateUI(false);
   }
-  if (writer) {
-    writer.releaseLock();
-    addLog("[DISCONNECT] Writer lock released");
-  }
-  if (port) {
-    await port.close();
-    addLog("[DISCONNECT] Port closed");
-  }
-  port = null;
-  reader = null;
-  writer = null;
-  updateUI(false);
 });
 
 // ── Relay buttons ─────────────────────────────────────────────────────────────
@@ -182,34 +133,11 @@ document.querySelectorAll(".btn-relay").forEach(btn => {
   });
 });
 
-// ── Config update listeners ───────────────────────────────────────────────────
-document.getElementById("baudRateInput").addEventListener("change", (e) => {
-  CONFIG.baudRate = parseInt(e.target.value);
-  saveConfig();
-  addLog(`Config: baud rate set to ${CONFIG.baudRate}`);
-});
-
-CONFIG.relays.forEach((relay) => {
-  const input = document.getElementById(`relayName${relay.id}`);
-  if (input) {
-    input.addEventListener("change", (e) => {
-      relay.name = e.target.value;
-      saveConfig();
-      // Update displayed name
-      const card = document.querySelector(`[data-relay-id="${relay.id}"] .relay-title`);
-      if (card) card.textContent = relay.name;
-      addLog(`Config: relay ${relay.id} renamed to "${relay.name}"`);
-    });
-  }
-});
-
 // ── Init ──────────────────────────────────────────────────────────────────────
-if (!navigator.serial) {
+if (!navigator.bluetooth) {
   document.getElementById("unsupported").style.display = "block";
 }
 
-loadConfig();
-updateRelayNames();
 updateUI(false);
-addLog("Ready. Click Connect to begin.");
-addLog("Relay buttons: Click ON/OFF to send CH<n>:ON / CH<n>:OFF commands");
+addLog("Ready. Click Connect to pair.");
+addLog("Relay buttons: Click ON/OFF to send commands.");
