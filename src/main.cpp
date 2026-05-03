@@ -7,7 +7,6 @@
 #define RELAY_ACTIVE_LOW false
 #define DEVICE_NAME "ESP32-Relay"
 
-
 // ── GPIO pins ─────────────────────────────────────────────────────────────────
 const uint8_t RELAY_PINS[4] = {23, 22, 19, 18};
 
@@ -22,7 +21,7 @@ bool deviceConnected = false;
 
 // ── Relay state ───────────────────────────────────────────────────────────────
 uint8_t  relayState[4]       = {0, 0, 0, 0};       // intent: 1=on, 0=off
-uint16_t relayInterval[4]    = {0, 0, 0, 0};       // toggle half-period ms (0=solid on)
+uint16_t relayInterval[4]    = {0, 0, 0, 0};       // toggle half-period ms (0=solid on, default)
 bool     relayPhysical[4]    = {false, false, false, false}; // actual GPIO state
 uint32_t relayLastToggle[4]  = {0, 0, 0, 0};       // millis() of last toggle
 
@@ -66,9 +65,28 @@ class CommandCallbacks : public BLECharacteristicCallbacks {
 };
 
 void handleCommand(const std::string &cmd) {
-  // Format: "CHn:ON", "CHn:OFF", or "CHn:ON:N" (N = interval ms)
-  if (cmd.length() < 5) return;
+  if (cmd.length() < 3) return;
 
+  // Handle CONFIG command: "CONFIG:CHn:interval=N"
+  if (cmd.substr(0, 6) == "CONFIG") {
+    Serial.printf("[CONFIG] Parsing: %s\n", cmd.c_str());
+    // Example: "CONFIG:CH1:interval=5000"
+    size_t ch_pos = cmd.find("CH");
+    if (ch_pos != std::string::npos) {
+      int ch = cmd[ch_pos + 2] - '0';
+      if (ch >= 1 && ch <= 4) {
+        size_t eq_pos = cmd.find('=');
+        if (eq_pos != std::string::npos) {
+          uint16_t intervalVal = (uint16_t)atoi(cmd.c_str() + eq_pos + 1);
+          relayInterval[ch - 1] = intervalVal;
+          Serial.printf("[CONFIG] CH%d interval set to %u ms\n", ch, intervalVal);
+        }
+      }
+    }
+    return;
+  }
+
+  // Handle relay command: "CHn:ON", "CHn:OFF", or "CHn:ON:N"
   if (cmd[0] == 'C' && cmd[1] == 'H') {
     int ch = cmd[2] - '0';
     bool isOn = (cmd.find("ON") != std::string::npos);
@@ -77,8 +95,7 @@ void handleCommand(const std::string &cmd) {
       int idx = ch - 1;
 
       if (isOn) {
-        // Parse optional interval: "CHn:ON:N"
-        size_t secondColon = cmd.find(':', 4); // skip "CHn:"
+        size_t secondColon = cmd.find(':', 4);
         if (secondColon != std::string::npos) {
           int intervalVal = atoi(cmd.c_str() + secondColon + 1);
           relayInterval[idx] = (uint16_t)intervalVal;
@@ -107,14 +124,12 @@ void setup() {
   delay(1000);
   Serial.println("[Setup] Starting...");
 
-  // Init pins
   for (int i = 0; i < 4; i++) {
     pinMode(RELAY_PINS[i], OUTPUT);
     applyRelay(i, false);
   }
   Serial.println("[Setup] GPIO initialized");
 
-  // BLE
   Serial.println("[BLE] Initializing...");
   BLEDevice::init(DEVICE_NAME);
   pServer = BLEDevice::createServer();

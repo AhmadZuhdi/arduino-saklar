@@ -1,7 +1,7 @@
 import { RelayCard } from './RelayCard'
 import styles from '../styles/components.module.css'
 
-export function RelayGrid({ relayState, onToggle }) {
+export function RelayGrid({ relayState, onToggle, relayNames }) {
   return (
     <div className={styles.relayGrid}>
       {[1, 2, 3, 4].map(ch => (
@@ -10,6 +10,7 @@ export function RelayGrid({ relayState, onToggle }) {
           channel={ch}
           relayState={relayState[ch - 1]}
           onToggle={onToggle}
+          relayName={relayNames?.[ch - 1]}
         />
       ))}
     </div>

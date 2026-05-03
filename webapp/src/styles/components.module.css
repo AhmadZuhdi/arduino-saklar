@@ -56,31 +56,33 @@
 .btnDisconnect:hover { background: #e53935; }
 
 .relayGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   margin-bottom: 30px;
 }
 
 .relayCard {
   background: #0f1419;
-  padding: 15px;
+  padding: 16px;
   border-radius: 6px;
   border: 1px solid #2a2f4a;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .relayTitle {
   font-weight: 600;
-  margin-bottom: 10px;
   font-size: 14px;
   text-transform: uppercase;
   color: #64b5f6;
 }
 
 .toggleBtn {
-  width: 100%;
-  padding: 12px;
-  font-size: 14px;
+  width: 80px;
+  padding: 10px;
+  font-size: 13px;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s;
@@ -89,6 +91,7 @@
   text-transform: uppercase;
   background: #2a2f4a;
   color: #b0b0b0;
+  flex-shrink: 0;
 }
 
 .toggleBtn.on {

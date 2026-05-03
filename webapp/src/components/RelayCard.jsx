@@ -3,7 +3,7 @@ import { BLEContext } from '../context/BLEContext'
 import { useBLE } from '../hooks/useBLE'
 import styles from '../styles/components.module.css'
 
-export function RelayCard({ channel, relayState, onToggle }) {
+export function RelayCard({ channel, relayState, onToggle, relayName }) {
   const ctx = useContext(BLEContext)
   const { sendCommand } = useBLE()
 
@@ -15,7 +15,7 @@ export function RelayCard({ channel, relayState, onToggle }) {
 
   return (
     <div className={styles.relayCard}>
-      <div className={styles.relayTitle}>Channel {channel}</div>
+      <div className={styles.relayTitle}>{relayName || `Channel ${channel}`}</div>
       <button
         className={`${styles.toggleBtn} ${relayState ? styles.on : ''}`}
         onClick={handleClick}

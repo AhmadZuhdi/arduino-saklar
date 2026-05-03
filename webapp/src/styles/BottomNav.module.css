@@ -1,0 +1,40 @@
+.bottomNav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: #0f1419;
+  border-top: 1px solid #2a2f4a;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 100;
+}
+
+.navBtn {
+  flex: 1;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: #b0b0b0;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.navBtn:hover {
+  color: #64b5f6;
+  background: rgba(100, 181, 246, 0.1);
+}
+
+.navBtn.active {
+  color: #64b5f6;
+  border-bottom: 3px solid #64b5f6;
+}
