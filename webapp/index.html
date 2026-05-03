@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ESP32 Relay Control</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>⚡ ESP32 Relay Control</h1>
+
+    <div id="unsupported" class="warning" style="display:none;">
+      <strong>⚠ Web Serial API not supported</strong><br>
+      Use Chrome or Edge. Safari and Firefox do not support Web Serial API.
+    </div>
+
+    <!-- Connection Section -->
+    <div class="section">
+      <h2>Connection</h2>
+      <div class="status-line">
+        <div>
+          <span class="status-indicator" id="statusIndicator"></span>
+          <span class="status-text" id="statusText">Disconnected</span>
+        </div>
+        <div id="portInfo" style="font-size: 12px; color: #666;"></div>
+      </div>
+      <button class="btn-connect" id="btnConnect">Connect</button>
+      <button class="btn-disconnect" id="btnDisconnect" style="display:none;">Disconnect</button>
+    </div>
+
+    <!-- Config Section -->
+    <div class="section">
+      <h2>Configuration</h2>
+      <div class="config-grid">
+        <div class="config-field">
+          <label for="baudRateInput">Baud Rate</label>
+          <input type="number" id="baudRateInput" value="9600" min="300" max="921600" step="1">
+        </div>
+      </div>
+      <h2>Relay Names</h2>
+      <div class="config-grid">
+        <div class="config-field">
+          <label for="relayName1">Channel 1</label>
+          <input type="text" id="relayName1" placeholder="Channel 1">
+        </div>
+        <div class="config-field">
+          <label for="relayName2">Channel 2</label>
+          <input type="text" id="relayName2" placeholder="Channel 2">
+        </div>
+        <div class="config-field">
+          <label for="relayName3">Channel 3</label>
+          <input type="text" id="relayName3" placeholder="Channel 3">
+        </div>
+        <div class="config-field">
+          <label for="relayName4">Channel 4</label>
+          <input type="text" id="relayName4" placeholder="Channel 4">
+        </div>
+      </div>
+    </div>
+
+    <!-- Relay Control Section -->
+    <div>
+      <h2>Relay Control</h2>
+      <div class="relay-grid" id="relayGrid">
+        <div class="relay-card" data-relay-id="1">
+          <div class="relay-title">Channel 1</div>
+          <div class="relay-buttons">
+            <button class="btn-relay on" data-channel="1" data-action="ON" disabled>ON</button>
+            <button class="btn-relay off" data-channel="1" data-action="OFF" disabled>OFF</button>
+          </div>
+        </div>
+        <div class="relay-card" data-relay-id="2">
+          <div class="relay-title">Channel 2</div>
+          <div class="relay-buttons">
+            <button class="btn-relay on" data-channel="2" data-action="ON" disabled>ON</button>
+            <button class="btn-relay off" data-channel="2" data-action="OFF" disabled>OFF</button>
+          </div>
+        </div>
+        <div class="relay-card" data-relay-id="3">
+          <div class="relay-title">Channel 3</div>
+          <div class="relay-buttons">
+            <button class="btn-relay on" data-channel="3" data-action="ON" disabled>ON</button>
+            <button class="btn-relay off" data-channel="3" data-action="OFF" disabled>OFF</button>
+          </div>
+        </div>
+        <div class="relay-card" data-relay-id="4">
+          <div class="relay-title">Channel 4</div>
+          <div class="relay-buttons">
+            <button class="btn-relay on" data-channel="4" data-action="ON" disabled>ON</button>
+            <button class="btn-relay off" data-channel="4" data-action="OFF" disabled>OFF</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Log Section -->
+    <div class="log-section">
+      <div class="log-title">Debug Log</div>
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
