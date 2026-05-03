@@ -7,6 +7,7 @@
 #define RELAY_ACTIVE_LOW false
 #define DEVICE_NAME "ESP32-Relay"
 
+
 // ── GPIO pins ─────────────────────────────────────────────────────────────────
 const uint8_t RELAY_PINS[4] = {23, 22, 19, 18};
 
@@ -20,10 +21,23 @@ BLECharacteristic *pCharCmd = NULL;
 bool deviceConnected = false;
 
 // ── Relay state ───────────────────────────────────────────────────────────────
-uint8_t relayState[4] = {0, 0, 0, 0};
+uint8_t  relayState[4]       = {0, 0, 0, 0};       // intent: 1=on, 0=off
+uint16_t relayInterval[4]    = {0, 0, 0, 0};       // toggle half-period ms (0=solid on)
+bool     relayPhysical[4]    = {false, false, false, false}; // actual GPIO state
+uint32_t relayLastToggle[4]  = {0, 0, 0, 0};       // millis() of last toggle
 
-// ── Forward declaration ────────────────────────────────────────────────────────
+// ── Forward declarations ───────────────────────────────────────────────────────
 void handleCommand(const std::string &cmd);
+void applyRelay(int i, bool on);
+
+// ── GPIO helper ───────────────────────────────────────────────────────────────
+void applyRelay(int i, bool on) {
+#if RELAY_ACTIVE_LOW
+  digitalWrite(RELAY_PINS[i], on ? LOW : HIGH);
+#else
+  digitalWrite(RELAY_PINS[i], on ? HIGH : LOW);
+#endif
+}
 
 class ServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer *pServer) override {
@@ -52,21 +66,36 @@ class CommandCallbacks : public BLECharacteristicCallbacks {
 };
 
 void handleCommand(const std::string &cmd) {
-  // Format: "CH1:ON\n"
+  // Format: "CHn:ON", "CHn:OFF", or "CHn:ON:N" (N = interval ms)
   if (cmd.length() < 5) return;
 
   if (cmd[0] == 'C' && cmd[1] == 'H') {
     int ch = cmd[2] - '0';
     bool isOn = (cmd.find("ON") != std::string::npos);
+
     if (ch >= 1 && ch <= 4) {
-      Serial.printf("[Relay] CH%d %s\n", ch, isOn ? "ON" : "OFF");
-      uint8_t pin = RELAY_PINS[ch - 1];
-#if RELAY_ACTIVE_LOW
-      digitalWrite(pin, isOn ? LOW : HIGH);
-#else
-      digitalWrite(pin, isOn ? HIGH : LOW);
-#endif
-      relayState[ch - 1] = isOn ? 1 : 0;
+      int idx = ch - 1;
+
+      if (isOn) {
+        // Parse optional interval: "CHn:ON:N"
+        size_t secondColon = cmd.find(':', 4); // skip "CHn:"
+        if (secondColon != std::string::npos) {
+          int intervalVal = atoi(cmd.c_str() + secondColon + 1);
+          relayInterval[idx] = (uint16_t)intervalVal;
+        }
+
+        relayState[idx]      = 1;
+        relayPhysical[idx]   = true;
+        relayLastToggle[idx] = millis();
+        applyRelay(idx, true);
+        Serial.printf("[Relay] CH%d ON (interval=%ums)\n", ch, relayInterval[idx]);
+      } else {
+        relayState[idx]      = 0;
+        relayPhysical[idx]   = false;
+        relayLastToggle[idx] = 0;
+        applyRelay(idx, false);
+        Serial.printf("[Relay] CH%d OFF\n", ch);
+      }
       return;
     }
   }
@@ -81,7 +110,7 @@ void setup() {
   // Init pins
   for (int i = 0; i < 4; i++) {
     pinMode(RELAY_PINS[i], OUTPUT);
-    digitalWrite(RELAY_PINS[i], LOW);
+    applyRelay(i, false);
   }
   Serial.println("[Setup] GPIO initialized");
 
@@ -107,5 +136,15 @@ void setup() {
 }
 
 void loop() {
-  delay(100);
+  uint32_t now = millis();
+
+  for (int i = 0; i < 4; i++) {
+    if (relayState[i] == 0 || relayInterval[i] == 0) continue;
+
+    if (now - relayLastToggle[i] >= relayInterval[i]) {
+      relayPhysical[i] = !relayPhysical[i];
+      applyRelay(i, relayPhysical[i]);
+      relayLastToggle[i] = now;
+    }
+  }
 }
