@@ -1,0 +1,143 @@
+.statusLine {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.statusIndicator {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ff6b6b;
+  margin-right: 10px;
+}
+
+.statusIndicator.connected {
+  background: #51cf66;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.statusText {
+  font-size: 14px;
+  color: #b0b0b0;
+}
+
+.btnConnect,
+.btnDisconnect {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  width: 100%;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btnConnect {
+  background: #64b5f6;
+  color: #0a0e27;
+}
+
+.btnConnect:hover { background: #42a5f5; }
+
+.btnDisconnect {
+  background: #ef5350;
+  color: white;
+  margin-top: 10px;
+}
+
+.btnDisconnect:hover { background: #e53935; }
+
+.relayGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.relayCard {
+  background: #0f1419;
+  padding: 15px;
+  border-radius: 6px;
+  border: 1px solid #2a2f4a;
+}
+
+.relayTitle {
+  font-weight: 600;
+  margin-bottom: 10px;
+  font-size: 14px;
+  text-transform: uppercase;
+  color: #64b5f6;
+}
+
+.toggleBtn {
+  width: 100%;
+  padding: 12px;
+  font-size: 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  font-weight: 600;
+  text-transform: uppercase;
+  background: #2a2f4a;
+  color: #b0b0b0;
+}
+
+.toggleBtn.on {
+  background: #51cf66;
+  color: #0a0e27;
+}
+
+.toggleBtn:hover:not(:disabled) {
+  opacity: 0.8;
+  transform: scale(1.05);
+}
+
+.toggleBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.logSection {
+  background: #0f1419;
+  border-radius: 6px;
+  padding: 15px;
+  border: 1px solid #2a2f4a;
+}
+
+.logTitle {
+  font-size: 12px;
+  text-transform: uppercase;
+  color: #64b5f6;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+.log {
+  font-family: "Monaco", "Courier New", monospace;
+  font-size: 11px;
+  max-height: 200px;
+  overflow-y: auto;
+  background: #0a0e27;
+  padding: 10px;
+  border-radius: 4px;
+  color: #90ee90;
+  line-height: 1.4;
+}
+
+.logEntry {
+  word-break: break-all;
+  margin-bottom: 4px;
+}
+
+.logEntry.error {
+  color: #ff6b6b;
+}
