@@ -1,4 +1,6 @@
 const express = require('express');
+const https = require('https');
+const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
@@ -7,7 +9,19 @@ const PORT = 8000;
 
 app.use(express.static(path.join(__dirname)));
 
-app.listen(PORT, () => {
+// Load SSL cert (or use HTTP if not available)
+let server;
+try {
+  const key = fs.readFileSync(path.join(__dirname, 'key.pem'));
+  const cert = fs.readFileSync(path.join(__dirname, 'cert.pem'));
+  server = https.createServer({ key, cert }, app);
+  console.log('✓ Using HTTPS (self-signed certificate)');
+} catch (err) {
+  console.log('⚠ HTTPS cert not found, using HTTP');
+  server = require('http').createServer(app);
+}
+
+server.listen(PORT, () => {
   const ifaces = os.networkInterfaces();
   let ip = 'localhost';
   
@@ -20,6 +34,9 @@ app.listen(PORT, () => {
     }
   }
 
-  console.log(`\n✓ Server running at http://localhost:${PORT}`);
-  console.log(`✓ Access from phone: http://${ip}:${PORT}\n`);
+  const protocol = server instanceof https.Server ? 'https' : 'http';
+  console.log(`\n✓ Server running at ${protocol}://localhost:${PORT}`);
+  console.log(`✓ Access from phone: ${protocol}://${ip}:${PORT}\n`);
+  console.log('Note: Self-signed cert — accept warning on first visit\n');
 });
+

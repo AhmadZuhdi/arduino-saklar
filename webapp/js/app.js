@@ -17,6 +17,7 @@ let server = null;
 let service = null;
 let charCommand = null;
 let connected = false;
+let relayState = [0, 0, 0, 0]; // Track relay states locally
 
 // ── Logging ───────────────────────────────────────────────────────────────────
 function addLog(msg, isError = false) {
@@ -36,7 +37,7 @@ function updateUI(isConnected) {
   const statusText = document.getElementById("statusText");
   const btnConnect = document.getElementById("btnConnect");
   const btnDisconnect = document.getElementById("btnDisconnect");
-  const relayButtons = document.querySelectorAll(".btn-relay");
+  const relayButtons = document.querySelectorAll(".toggle-btn");
 
   if (isConnected) {
     indicator.classList.add("connected");
@@ -51,6 +52,8 @@ function updateUI(isConnected) {
     btnConnect.style.display = "block";
     btnDisconnect.style.display = "none";
     relayButtons.forEach(b => b.disabled = true);
+    relayState = [0, 0, 0, 0];
+    updateRelayUI();
     addLog("Disconnected", true);
   }
 }
@@ -77,8 +80,33 @@ async function sendCommand(channel, action) {
     
     await charCommand.writeValue(encoded);
     addLog("[SEND] ✓");
+    relayState[channel - 1] = action === "ON" ? 1 : 0;
+    updateRelayUI();
   } catch (err) {
     addLog(`[SEND] Error: ${err.message}`, true);
+  }
+}
+
+// ── Toggle relay ───────────────────────────────────────────────────────────────
+async function toggleRelay(channel) {
+  const newState = relayState[channel - 1] ? "OFF" : "ON";
+  await sendCommand(channel, newState);
+}
+
+// ── Update relay button UI ─────────────────────────────────────────────────────
+function updateRelayUI() {
+  for (let i = 0; i < 4; i++) {
+    const channel = i + 1;
+    const btn = document.querySelector(`[data-channel="${channel}"].toggle-btn`);
+    if (btn) {
+      if (relayState[i]) {
+        btn.classList.add("on");
+        btn.textContent = "ON";
+      } else {
+        btn.classList.remove("on");
+        btn.textContent = "OFF";
+      }
+    }
   }
 }
 
@@ -125,11 +153,10 @@ document.getElementById("btnDisconnect").addEventListener("click", () => {
 });
 
 // ── Relay buttons ─────────────────────────────────────────────────────────────
-document.querySelectorAll(".btn-relay").forEach(btn => {
+document.querySelectorAll(".toggle-btn").forEach(btn => {
   btn.addEventListener("click", () => {
-    const channel = btn.getAttribute("data-channel");
-    const action = btn.getAttribute("data-action");
-    sendCommand(channel, action);
+    const channel = parseInt(btn.getAttribute("data-channel"));
+    toggleRelay(channel);
   });
 });
 
