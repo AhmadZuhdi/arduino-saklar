@@ -2,10 +2,13 @@
 #include <BLEDevice.h>
 #include <BLEServer.h>
 #include <BLEUtils.h>
+#include <Preferences.h>
 
 // ── Config ────────────────────────────────────────────────────────────────────
 #define RELAY_ACTIVE_LOW false
 #define DEVICE_NAME "ESP32-Relay"
+
+Preferences preferences;
 
 // ── GPIO pins ─────────────────────────────────────────────────────────────────
 const uint8_t RELAY_PINS[4] = {23, 22, 19, 18};
@@ -28,6 +31,8 @@ uint32_t relayLastToggle[4]  = {0, 0, 0, 0};       // millis() of last toggle
 // ── Forward declarations ───────────────────────────────────────────────────────
 void handleCommand(const std::string &cmd);
 void applyRelay(int i, bool on);
+void readConfig();
+void saveConfig();
 
 // ── GPIO helper ───────────────────────────────────────────────────────────────
 void applyRelay(int i, bool on) {
@@ -77,12 +82,19 @@ void handleCommand(const std::string &cmd) {
       if (ch >= 1 && ch <= 4) {
         size_t eq_pos = cmd.find('=');
         if (eq_pos != std::string::npos) {
+          preferences.begin("saklar", false);
+          unsigned int oldValue = preferences.getUInt(("relayMs" + String(ch)).c_str(), relayInterval[ch - 1]);
           uint16_t intervalVal = (uint16_t)atoi(cmd.c_str() + eq_pos + 1);
           relayInterval[ch - 1] = intervalVal;
           Serial.printf("[CONFIG] CH%d interval set to %u ms\n", ch, intervalVal);
+          if (oldValue != intervalVal) {
+            preferences.putUInt(("relayMs" + String(ch)).c_str(), intervalVal);
+            Serial.println("[CONFIG] Configuration saved");
+          }
         }
       }
     }
+
     return;
   }
 
@@ -148,6 +160,30 @@ void setup() {
 
   Serial.println("[BLE] Advertising started");
   Serial.printf("[BLE] Device: %s\n", DEVICE_NAME);
+
+  preferences.begin("saklar", false);
+  unsigned int counter = preferences.getUInt("counter", 0);
+  counter++;
+  Serial.printf("Current boot count: %u\n", counter);
+  preferences.putUInt("counter", counter);
+  preferences.end();
+
+  Serial.println("[Setup] Completed");
+  readConfig(); 
+}
+
+void readConfig() {
+  preferences.begin("saklar", false);
+  Serial.println("[Config] loaded configurations");
+  for (int i = 0; i < 4; i++) {
+    relayInterval[i] = preferences.getUInt(("relayMs" + String(i + 1)).c_str(), relayInterval[i]);
+    Serial.printf("[Config] CH%d interval: %u ms\n", i + 1, relayInterval[i]);
+  }
+  preferences.end();
+}
+
+void saveConfig() {
+  
 }
 
 void loop() {
