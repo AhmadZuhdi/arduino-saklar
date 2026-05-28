@@ -24,15 +24,19 @@ bool deviceConnected = false;
 
 // ── Relay state ───────────────────────────────────────────────────────────────
 uint8_t  relayState[4]       = {0, 0, 0, 0};       // intent: 1=on, 0=off
-uint16_t relayInterval[4]    = {0, 0, 0, 0};       // toggle half-period ms (0=solid on, default)
+uint16_t relayInterval[4]    = {100, 0, 0, 0};       // toggle half-period ms (0=solid on, default)
 bool     relayPhysical[4]    = {false, false, false, false}; // actual GPIO state
 uint32_t relayLastToggle[4]  = {0, 0, 0, 0};       // millis() of last toggle
+
+// -- optocoupler
+const int optoPin = 21; // Pin connected to PC817 Collector
 
 // ── Forward declarations ───────────────────────────────────────────────────────
 void handleCommand(const std::string &cmd);
 void applyRelay(int i, bool on);
 void readConfig();
 void saveConfig();
+void changeRelayState(int ch, bool on);
 
 // ── GPIO helper ───────────────────────────────────────────────────────────────
 void applyRelay(int i, bool on) {
@@ -68,6 +72,13 @@ class CommandCallbacks : public BLECharacteristicCallbacks {
     }
   }
 };
+
+void changeRelayState(int ch, bool on) {
+  relayState[ch]      = on ? 1 : 0;
+  relayPhysical[ch]   = on;
+  relayLastToggle[ch] = on ? millis() : 0;
+  applyRelay(ch, on);
+}
 
 void handleCommand(const std::string &cmd) {
   if (cmd.length() < 3) return;
@@ -106,25 +117,26 @@ void handleCommand(const std::string &cmd) {
     if (ch >= 1 && ch <= 4) {
       int idx = ch - 1;
 
-      if (isOn) {
-        size_t secondColon = cmd.find(':', 4);
-        if (secondColon != std::string::npos) {
-          int intervalVal = atoi(cmd.c_str() + secondColon + 1);
-          relayInterval[idx] = (uint16_t)intervalVal;
-        }
+      // if (isOn) {
+      //   size_t secondColon = cmd.find(':', 4);
+      //   if (secondColon != std::string::npos) {
+      //     int intervalVal = atoi(cmd.c_str() + secondColon + 1);
+      //     relayInterval[idx] = (uint16_t)intervalVal;
+      //   }
 
-        relayState[idx]      = 1;
-        relayPhysical[idx]   = true;
-        relayLastToggle[idx] = millis();
-        applyRelay(idx, true);
-        Serial.printf("[Relay] CH%d ON (interval=%ums)\n", ch, relayInterval[idx]);
-      } else {
-        relayState[idx]      = 0;
-        relayPhysical[idx]   = false;
-        relayLastToggle[idx] = 0;
-        applyRelay(idx, false);
-        Serial.printf("[Relay] CH%d OFF\n", ch);
-      }
+      //   relayState[idx]      = 1;
+      //   relayPhysical[idx]   = true;
+      //   relayLastToggle[idx] = millis();
+      //   applyRelay(idx, true);
+      //   Serial.printf("[Relay] CH%d ON (interval=%ums)\n", ch, relayInterval[idx]);
+      // } else {
+      //   relayState[idx]      = 0;
+      //   relayPhysical[idx]   = false;
+      //   relayLastToggle[idx] = 0;
+      //   applyRelay(idx, false);
+      //   Serial.printf("[Relay] CH%d OFF\n", ch);
+      // }
+      changeRelayState(idx, isOn);
       return;
     }
   }
@@ -170,6 +182,9 @@ void setup() {
 
   Serial.println("[Setup] Completed");
   readConfig(); 
+
+  // optocoupler setup
+  pinMode(optoPin, INPUT_PULLUP);
 }
 
 void readConfig() {
@@ -197,5 +212,16 @@ void loop() {
       applyRelay(i, relayPhysical[i]);
       relayLastToggle[i] = now;
     }
+  }
+
+  int sensorValue = digitalRead(optoPin);
+
+  // Remember: Logic is inverted due to INPUT_PULLUP
+  if (sensorValue == LOW && !relayState[0]) { // Only trigger if not already on
+    Serial.println("Input Signal: DETECTED (ON)");
+    changeRelayState(0, true); // Example: Turn on CH1 when signal is detected
+  } else if (sensorValue == HIGH && relayState[0]) { // Only trigger if not already off
+    Serial.println("Input Signal: NOT DETECTED (OFF)");
+    changeRelayState(0, false); // Example: Turn on CH1 when signal is detected
   }
 }
