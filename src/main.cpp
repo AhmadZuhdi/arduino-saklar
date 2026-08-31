@@ -29,7 +29,8 @@ bool     relayPhysical[4]    = {false, false, false, false}; // actual GPIO stat
 uint32_t relayLastToggle[4]  = {0, 0, 0, 0};       // millis() of last toggle
 
 // -- optocoupler
-const int optoPin = 21; // Pin connected to PC817 Collector
+const int optoPin = 16; // Pin connected to PC817 Collector
+const int optoPin2 = 17; // Pin connected to PC817 Collector
 
 // ── Forward declarations ───────────────────────────────────────────────────────
 void handleCommand(const std::string &cmd);
@@ -116,26 +117,6 @@ void handleCommand(const std::string &cmd) {
 
     if (ch >= 1 && ch <= 4) {
       int idx = ch - 1;
-
-      // if (isOn) {
-      //   size_t secondColon = cmd.find(':', 4);
-      //   if (secondColon != std::string::npos) {
-      //     int intervalVal = atoi(cmd.c_str() + secondColon + 1);
-      //     relayInterval[idx] = (uint16_t)intervalVal;
-      //   }
-
-      //   relayState[idx]      = 1;
-      //   relayPhysical[idx]   = true;
-      //   relayLastToggle[idx] = millis();
-      //   applyRelay(idx, true);
-      //   Serial.printf("[Relay] CH%d ON (interval=%ums)\n", ch, relayInterval[idx]);
-      // } else {
-      //   relayState[idx]      = 0;
-      //   relayPhysical[idx]   = false;
-      //   relayLastToggle[idx] = 0;
-      //   applyRelay(idx, false);
-      //   Serial.printf("[Relay] CH%d OFF\n", ch);
-      // }
       changeRelayState(idx, isOn);
       return;
     }
@@ -185,6 +166,7 @@ void setup() {
 
   // optocoupler setup
   pinMode(optoPin, INPUT_PULLUP);
+  pinMode(optoPin2, INPUT_PULLUP);
 }
 
 void readConfig() {
@@ -215,13 +197,36 @@ void loop() {
   }
 
   int sensorValue = digitalRead(optoPin);
+  int sensorValue2 = digitalRead(optoPin2);
+
+  bool saklar1OnTop = sensorValue == LOW && sensorValue2 == HIGH;
+  bool saklar1Off = sensorValue == HIGH && sensorValue2 == HIGH;
+  bool saklar1OnBottom = sensorValue == HIGH && sensorValue2 == LOW;
+
+  // Serial.println(sensorValue);
+  // Serial.println(sensorValue2);
+  // Serial.println("===========");
+
 
   // Remember: Logic is inverted due to INPUT_PULLUP
-  if (sensorValue == LOW && !relayState[0]) { // Only trigger if not already on
-    Serial.println("Input Signal: DETECTED (ON)");
+  if (saklar1OnTop && !relayState[0]) { // Only trigger if not already on
+    Serial.println("Input Signal 1 Top: DETECTED (ON)");
     changeRelayState(0, true); // Example: Turn on CH1 when signal is detected
-  } else if (sensorValue == HIGH && relayState[0]) { // Only trigger if not already off
-    Serial.println("Input Signal: NOT DETECTED (OFF)");
+  } else if (saklar1OnBottom && !relayState[1]) { // Only trigger if not already on
+    Serial.println("Input Signal 1 Bottom: DETECTED (ON)");
+    changeRelayState(1, true); // Example: Turn on CH1 when signal is detected
+  } else if (saklar1Off) { // Only trigger if not already off
+    Serial.println("Input Signal 1: NOT DETECTED (OFF)");
     changeRelayState(0, false); // Example: Turn on CH1 when signal is detected
+    changeRelayState(1, false); // Example: Turn on CH1 when signal is detected
   }
+
+  // // Remember: Logic is inverted due to INPUT_PULLUP
+  // if (sensorValue2 == LOW && !relayState[1]) { // Only trigger if not already on
+  //   Serial.println("Input Signal 2: DETECTED (ON)");
+  //   changeRelayState(1, true); // Example: Turn on CH1 when signal is detected
+  // } else if (sensorValue2 == HIGH && relayState[1]) { // Only trigger if not already off
+  //   Serial.println("Input Signal 2: NOT DETECTED (OFF)");
+  //   changeRelayState(1, false); // Example: Turn on CH1 when signal is detected
+  // }
 }
